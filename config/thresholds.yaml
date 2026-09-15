@@ -1,0 +1,355 @@
+# ===========================================================================
+# thresholds.yaml
+#
+# POLICY: this file stores MULTIPLIERS, TARGET ALERT RATES and QUANTILE TARGETS.
+# It does not store literal cut-off values for statistical rules.
+#
+# Why: the previous iteration used fixed numbers guessed ahead of the data and
+# they failed measurably -- WALLET_BREAK fired on 495 of 500 candidates (~17% of
+# all accounts) and BOT_CADENCE was set at 700 ms against timestamps that only
+# have 1-second resolution. Both were unfalsifiable at the point they were
+# written. Every statistical threshold here is therefore DERIVED from the
+# observed population by `python -m riskdet calibrate`, which solves each rule's
+# multiplier so the rule fires at its target_alert_rate.
+#
+# A literal number appears below ONLY where it is physically or contractually
+# meaningful. Each one carries a source comment. If you find yourself adding a
+# bare number without a source, it belongs in the calibration solver instead.
+# ===========================================================================
+
+# --- global -----------------------------------------------------------------
+global:
+  # Minimum rounds in a peer cell before any per-player claim is made.
+  # Source: carried from reference code/detect_behavioural.py (MIN_ROUNDS=200),
+  # itself derived from the sandbox power analysis.
+  min_rounds_per_cell: 200
+
+  # Idle gap that starts a new synthetic session. RecordSlot has no session_id.
+  # Source: reference code/detect_behavioural.py SESSION_IDLE_MIN.
+  session_idle_minutes: 30
+
+  # Gaps longer than this are breaks, not play, and are excluded from cadence
+  # statistics. Source: reference code/detect_behavioural.py GAP_CAP_S.
+  cadence_gap_cap_seconds: 600
+
+  # Robust-threshold machinery. N is a STARTING multiplier only -- calibration
+  # overwrites it per metric. Source of the initial 12: sandbox derivation where
+  # p99.9 was contaminated by the abuser group itself (buy_share p99.9 = 9.23%
+  # vs abuser median 9.24%, recall collapsed to 5/26).
+  mad_multiplier_initial: 12
+  # Floor on MAD-collapse fallback: minimum members above the median before the
+  # nonzero-population branch is trusted, else fall back to a quantile.
+  mad_collapse_min_members: 20
+
+# --- time windows (UTC event time, i.e. game_time -- NEVER ReportDate) -------
+# ReportDate is a UTC+8 business date that spans two UTC calendar days; using
+# it as a boundary leaks up to 16 hours of future events. All boundaries below
+# bind the @as_of_time / window params on game_time.
+windows:
+  # 2026-05-01 -> 2026-07-31: training population (train_end is exclusive, so
+  # 2026-08-01 trains on all of May, June, July).
+  train_end: "2026-08-01T00:00:00"
+  # 2026-08-01 -> 2026-08-17: chronological (walk-forward) validation on the
+  # remaining archived data. Thresholds frozen from training are evaluated here,
+  # never re-fit here. (Archive currently ends 2026-08-17.)
+  validation_end: "2026-08-17T00:00:00"
+  # Rolling DETECTION window: a scan surfaces only cases whose player was active
+  # within this many days of --as-of (baselines still use full history). Set to 1
+  # for a true DAILY scan: it reports only the scan day's activity, so a day with
+  # no new data (e.g. 2026-09-01, archive ends 2026-08-17) yields an EMPTY report
+  # -- the correct production behaviour. 0 = cumulative (old behaviour). Widen for
+  # catch-up backfills. Game-level cases are always kept.
+  detection_window_days: 1
+  # August 2026 onward: hidden holdout. Physically present in the archive,
+  # logically invisible until replayed through rounds_asof(@as_of_time) in
+  # hourly/daily steps -- simulating live arrival with zero source rescans.
+  replay_step_hours: 24
+
+# --- calibration ------------------------------------------------------------
+calibration:
+  # ALERT-CAPACITY CEILING -- NOT a quota. No rule is tuned to flag the top
+  # 0.1%: on clean data every rule may (and should) produce ZERO findings.
+  # A candidate exists only when statistical significance (FDR-corrected),
+  # practical effect size, sufficient sample size, persistence, and a clean
+  # peer-group comparison ALL hold. The ceiling only RAISES a boundary when
+  # the evidence-based rule would exceed alert-handling capacity; it never
+  # lowers one to manufacture candidates.
+  alert_capacity_ceiling: 0.001     # max share of eligible population per rule
+  # Protocol: fit on May (train_end), FREEZE all parameters, measure firing
+  # rates on June-July per segment (game_id, play_type, currency, sm_tag,
+  # operator, volume group). PASS requires stable, sub-ceiling rates in every
+  # segment; August stays hidden for as_of replay.
+  stability_segment_max_factor: 10  # no segment may exceed ceiling x this
+  # Rules whose realised rate exceeds this anywhere are SATURATED and ship
+  # disabled with the reason recorded (the WALLET_BREAK lesson, automated).
+  saturation_abort_rate: 0.05
+
+# --- peer grouping ----------------------------------------------------------
+peer:
+  # Peer cell key. play_type is present because certified RTP is keyed on it and
+  # because stake scale differs by up to 300x between playways -- a base spin and
+  # a Feature Buy are different products.
+  key: [game_id, play_type, currency, sm_tag]
+  # Minimum distinct players in a cell before it can serve as a baseline.
+  min_players: 30
+  # Baselines exclude the candidate, the candidate's operator, and the
+  # candidate's structurally-detected cohort (anti-selection-bias).
+  leave_out: [candidate, operator, cohort]
+
+# --- per-rule configuration -------------------------------------------------
+# threshold_method: ROBUST | BINOMIAL | PERMUTATION | ABSOLUTE | STRUCTURAL
+# multiplier / effect_floor values marked `calibrated: true` are overwritten by
+# the calibration pass and should not be hand-edited.
+rules:
+  L1-SAME_SECOND:
+    family: TIMING
+    threshold_method: ROBUST
+    calibrated: true
+    min_gaps: 500
+    enabled: true
+
+  L1-CADENCE_MODE:
+    family: TIMING
+    threshold_method: ROBUST
+    calibrated: true
+    min_in_range_gaps: 1000
+    gap_range_seconds: [1, 30]
+    enabled: true
+
+  L1-DUTY_CYCLE:
+    family: TIMING
+    threshold_method: STRUCTURAL
+    # Literal and deliberately crude: humans sleep. 24 is the number of hours in
+    # a day, which is contractual with reality rather than with this dataset.
+    min_hours_covered: 22
+    min_active_days: 7
+    max_idle_hours: 3
+    enabled: true
+
+  L1-RATE_CEILING:
+    family: TIMING
+    threshold_method: ROBUST
+    calibrated: true
+    # Physical plausibility backstop, applied in addition to the robust bound.
+    # Source: a human cannot sustain 2 rounds/second across many distinct minutes.
+    physical_rounds_per_minute: 120
+    min_distinct_minutes: 10
+    enabled: true
+
+  L1-FEATURE_ROUTING:
+    family: ROUTING
+    threshold_method: ROBUST
+    calibrated: true
+    # Denominator is TURNOVER, not round count: a 5% round share of a 300x buy is
+    # a 94% turnover share, so the round-share version understates by ~20-60x.
+    denominator: turnover
+    enabled: true
+
+  L1-BET_STRUCTURE:
+    family: ROUTING
+    threshold_method: ROBUST
+    calibrated: true
+    restrict_play_type: 0     # else buy pricing dominates the statistic
+    enabled: true
+
+  L1-PRESCIENT_BET:
+    family: PRESCIENCE
+    threshold_method: PERMUTATION
+    permutations: 10000
+    restrict_play_type: 0
+    min_base_rounds: 2000
+    min_trigger_events: 30
+    fdr_q: 0.01
+    enabled: true
+
+  L1-TRIGGER_RATE:
+    family: OUTCOME_FREQUENCY
+    threshold_method: BINOMIAL
+    calibrated: true          # solver sets sigma_min and lift_min
+    restrict_play_type: 0     # buys trigger by definition; decorrelates from ROUTING
+    min_rounds: 2000
+    fdr_q: 0.01
+    enabled: true
+
+  L1-HIT_RATE:
+    family: OUTCOME_FREQUENCY
+    threshold_method: BINOMIAL
+    calibrated: true
+    min_rounds: 2000
+    fdr_q: 0.01
+    enabled: true
+
+  L1-EXCESS_TURNOVER:
+    family: OUTCOME_MAGNITUDE
+    threshold_method: ROBUST
+    calibrated: true
+    # Effect floor in RTP points, so significance alone cannot escalate. Set by
+    # calibration against the observed dispersion, starting from 3 points.
+    effect_floor_rtp_points_initial: 3.0
+    fdr_q: 0.01
+    baseline_preference: [certified, empirical_cell, none]
+    enabled: true
+
+  L1-MAX_X_BREACH:
+    family: INTEGRITY
+    threshold_method: ABSOLUTE
+    # Source: the certified max multiplier column of the OMG game sheet. Not a
+    # statistical threshold -- exceeding it is an exploit, a data error, or a
+    # wrong sheet, and all three are findings.
+    source: certified_max_multiplier
+    enabled: true
+
+  L1-BALANCE_IDENTITY:
+    family: INTEGRITY
+    threshold_method: ABSOLUTE
+    # Same-row identity: after_balance == before_balance - bet + win.
+    # Replaces the cross-row WALLET_BREAK, which fired on 17.4% of accounts
+    # because session boundaries and deposits break the chain legitimately.
+    # Relative tolerance, because MMK balances are ~1e5 and USD ~1e0.
+    relative_tolerance: 0.000001
+    absolute_tolerance: 0.01
+    expected_firing_rate: 0.0
+    enabled: true
+
+  L1-DUP_ROUND:
+    family: INTEGRITY
+    threshold_method: ABSOLUTE
+    # Cannot distinguish a double-settle from an ETL duplicate in BigQuery --
+    # only the spin-server response count in Cloud Logging can. Always a
+    # candidate for Layer 4 adjudication, never a finding on its own.
+    requires_log_adjudication: true
+    enabled: true
+
+  L1-CONCURRENT:
+    family: INTEGRITY
+    threshold_method: ROBUST
+    calibrated: true
+    # Rounds at gap <= 0 across DIFFERENT game_id on one uid.
+    min_events_initial: 5
+    enabled: true
+
+  L1-BETA_IN_PROD:
+    family: ENVIRONMENT
+    threshold_method: ABSOLUTE
+    # An attribute of the BUILD, shared by every player on it. Reported as a
+    # game-level finding; never contributes to a player's independent-signal
+    # count, or one deploy manufactures N confirmations.
+    scope: game_level_only
+    enabled: true
+
+# --- rules removed, with the evidence that removed them ---------------------
+retired:
+  WALLET_BREAK:
+    reason: >
+      Cross-row definition (before_balance != previous after_balance) fired on
+      495/500 candidates and ~17.4% of all accounts. Round-by-round inspection
+      of a flagged account showed the chain was perfectly continuous; the breaks
+      were session boundaries, deposits and other-vertical play. Near-zero
+      information. Replaced by L1-BALANCE_IDENTITY (same-row). Wallet PROVENANCE
+      is not in RecordSlot at all and moves to Layer 4.
+    replaced_by: L1-BALANCE_IDENTITY
+  BOT_CADENCE:
+    reason: >
+      Defined as >=35% of gaps under 700 ms, but 100% of inter-round gaps are
+      exact multiples of 1000 ms -- game_time has 1-second resolution. The rule
+      could only ever detect "two rounds in the same second".
+    replaced_by: [L1-SAME_SECOND, L1-CADENCE_MODE, L1-RATE_CEILING]
+  METRONOME:
+    reason: >
+      Gap coefficient of variation on quantised integer gaps is dominated by the
+      quantisation, not by behaviour. Fired 0 times in 30 days.
+    replaced_by: L1-CADENCE_MODE
+  JACKPOT_FARM:
+    reason: >
+      Count of jackpot hits is confounded with volume -- a whale hits more
+      jackpots trivially. Fired 0 times. Retained at game level as JACKPOT_SPIKE.
+    replaced_by: null
+  BEH_4_OUTCOME_REPETITION:
+    reason: >
+      A degraded proxy for reel-window repetition using (win, bet,
+      result_feature_code); median repetition was already 19% of winning rounds,
+      so it does not discriminate. True board repetition needs slotWindow, which
+      exists only in Cloud Logging.
+    demoted_to: context_field
+
+# --- fusion / escalation ----------------------------------------------------
+fusion:
+  # Independence is counted by FAMILY, not by rule. CLAUDE.md: "Correlated
+  # signals derived from the same underlying event must not be counted as
+  # independent confirmation."
+  count_by: family
+  escalate_monitor_families: 1
+  escalate_enhanced_families: 2
+  escalate_human_review_families: 2
+  # ENVIRONMENT never contributes to a player's independent count.
+  non_contributing_families: [ENVIRONMENT]
+  # The single-family exceptional route, defined quantitatively because an
+  # undefined "exceptionally strong evidence" clause will be used to escalate
+  # anything. ALL conditions must hold.
+  exceptional_single_family:
+    min_sigma_leave_cohort_out: 6.0
+    min_effect_rtp_points: 3.0
+    min_rate_lift: 2.0
+    require_persistence_both_halves: true    # REQUIRED: z alone can't separate a
+                                             # real exploit from a lucky account
+    require_baseline_source: certified
+  # Absolute-integrity single-family route. An absolute breach (over the certified
+  # cap, wallet-identity violation, duplicate-settled round) is a deterministic
+  # identity/contract violation, not a statistical tail -- no variance-driven
+  # false positives -- so a SINGLE one escalates to human_review on its own.
+  # Integrity signals have no z, so they cannot use exceptional_single_family.
+  integrity_single_family:
+    enabled: true
+    # LOG-* ids come from the per-minute Cloud Logging monitor. They belong here
+    # for the same reason as the L1 ids: each is a DETERMINISTIC breach with no
+    # variance-driven false-positive risk. LOG-DOUBLE_SETTLE is in fact stronger
+    # than L1-DUP_ROUND -- it carries the spin-server response count, which is
+    # the very fact L1-DUP_ROUND has to defer to Layer 4 to obtain.
+    signal_ids: [L1-MAX_X_BREACH, L1-BALANCE_IDENTITY, L1-DUP_ROUND,
+                 LOG-DOUBLE_SETTLE, LOG-ROUND_REPLAY]
+  # Game-level RTP-drift single-family route. A whole game-cell drifting from its
+  # CERTIFIED RTP is a game/platform defect, not a player issue. It escalates to
+  # human_review when material AND persistent AND BH-FDR-validated (Layer 2 only
+  # emits BH-selected days). Small/one-off drifts stay at monitor.
+  drift_single_family:
+    enabled: true
+    min_effect_rtp_points: 2.0     # warn from +2 RTP points off certified
+    min_cell_days: 2               # persisted on >= 2 distinct cell-days
+
+# --- anti-selection-bias ----------------------------------------------------
+selection_bias:
+  # A cohort whose pooled statistic is null cannot have a meaningful maximum.
+  # The prior run's top candidate came from a fleet with pooled RTP 0.9703.
+  cohort_null_sigma: 1.0
+  auto_downgrade_label: population_maximum_of_null_cohort
+  require_split_half_persistence: true
+  # Report the expected maximum z for the population size tested, so a "4 sigma"
+  # rule cannot be mistaken for a finding at N=1e6 (where null max z is ~4.9).
+  report_expected_max_z: true
+
+# --- coordinated cohort detection -------------------------------------------
+# NEUTRAL by design: the detector establishes that accounts MOVE TOGETHER --
+# a fact. WHY they move together is a hypothesis for investigation. Competing
+# explanations, always reported with a proposal: QA/load-test harness,
+# promotion cohort, autoplay defaults, account migration, shared terminals
+# (internet cafes), affiliate bulk registration, genuinely coordinated play,
+# ETL artifacts.
+#
+# Governance: detection NEVER excludes and NEVER suppresses. Unapproved
+# cohorts stay fully visible; downstream analyses report BOTH the inclusive
+# and the leave-cohort-out result side by side. Only a human moving a cohort
+# into config/exclusions.yaml (with approver/date/ticket) removes it.
+#
+# The sensitivity parameters below are structural-detection tuning, validated
+# on synthetic cohorts (tests), not statistical thresholds.
+cohort_detection:
+  min_agreeing_fingerprints: 3
+  min_members: 10
+  uid_suffix_min_density: 0.5       # dense sequential numeric block
+  birth_window_minutes: 60          # first-seen spread for "synchronised birth"
+  behavioural_cv_max: 0.05          # near-identity: mean CV of timing features
+  cadence_correlation_threshold: 0.8  # mean pairwise corr of hour-of-day profiles
+  cadence_min_shared_active_hours: 12 # hours-of-day both members are active in
+  scale_outlier_factor: 20          # cohort median rounds vs parent median
+  member_rtp_spread_min: 0.02       # member RTP range for the variance-spread
+                                    # signature (ratios: currency-neutral)

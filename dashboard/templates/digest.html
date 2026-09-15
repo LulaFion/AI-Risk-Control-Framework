@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ '每日摘要 — AI Risk Control' if lang == 'zh' else 'Daily Digest — AI Risk Control' }}{% endblock %}
+{% block nav_digest %}active{% endblock %}
+{% block content %}
+
+<div class="filters">
+    <div class="filter">
+        <label data-i18n="digest_date"></label>
+        <input type="date" id="f-date" value="{{ default_date }}">
+    </div>
+    <button class="btn" id="btn-load" data-i18n="load"></button>
+</div>
+
+<div class="grid grid-kpi" id="kpis"></div>
+
+<div class="grid grid-2 section-gap">
+    <div class="card">
+        <h2><span data-i18n="caveats"></span> <span class="sub" data-i18n="caveats_sub"></span></h2>
+        <div id="caveats"></div>
+    </div>
+    <div class="card">
+        <h2 data-i18n="today_by_sev"></h2>
+        <div class="chart-box" style="height:190px"><canvas id="sev-chart"></canvas></div>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <h2><span data-i18n="ai_digest"></span> <span class="sub" id="digest-when"></span></h2>
+    <div class="digest-headline" id="digest-headline"></div>
+    <div class="digest-stats" id="digest-stats"></div>
+    <div class="look-first" id="look-first"></div>
+    <div class="section-gap" id="decision-block">
+        <h3 data-i18n="decision_items"></h3>
+        <div id="decision-items"></div>
+    </div>
+    <div class="section-gap" id="observations-block">
+        <h3 data-i18n="observations"></h3>
+        <div id="observations"></div>
+    </div>
+    <div class="section-gap" id="ai-review-block">
+        <h3 data-i18n="ai_review"></h3>
+        <div id="ai-review"></div>
+    </div>
+    <div class="section-gap" id="todos-block">
+        <h3 data-i18n="todos"></h3>
+        <div id="todos"></div>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <h2><span data-i18n="risk_events"></span> <span class="sub" id="events-count"></span></h2>
+    <div class="filters">
+        <div class="filter"><label data-i18n="severity"></label>
+            <select id="f-sev"><option value="" data-i18n="all"></option>
+                <option value="Critical"></option><option value="High"></option>
+                <option value="Medium"></option><option value="Low"></option></select></div>
+        <div class="filter"><label data-i18n="status"></label>
+            <select id="f-status"><option value="" data-i18n="all"></option>
+                <option value="new"></option><option value="investigating"></option>
+                <option value="skeptic_review"></option><option value="confirmed"></option>
+                <option value="downgraded"></option><option value="rejected"></option>
+                <option value="monitoring"></option><option value="closed"></option></select></div>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead><tr>
+                <th data-i18n="detected"></th><th data-i18n="severity"></th>
+                <th data-i18n="type"></th><th data-i18n="event"></th>
+                <th data-i18n="operator"></th><th data-i18n="key_metric"></th>
+                <th data-i18n="status"></th>
+            </tr></thead>
+            <tbody id="events-body"></tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/digest.js') }}"></script>
+{% endblock %}

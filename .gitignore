@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# CREDENTIALS
+#
+# The service-account key formerly sat in this folder unencrypted. It now lives
+# outside the project tree at:
+#     C:\Users\user\.config\gcloud\keys\acp-prod-e80f50c53bfe_airc.json
+#
+# Prefer Application Default Credentials (google.auth.default()) over any key
+# file. Nothing matching the patterns below may ever be committed.
+# ---------------------------------------------------------------------------
+*.json
+!config/*.schema.json
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*-key.json
+*credential*
+*service-account*
+*client_secret*
+
+# ---------------------------------------------------------------------------
+# Generated artifacts -- reproducible from a run, never a source of truth.
+# out/    = machine data (CSV/JSONL)
+# output/ = the Layer 4 agent contract surface (Markdown)
+# ---------------------------------------------------------------------------
+out/
+output/
+!out/.gitkeep
+!output/.gitkeep
+
+# Fixtures hold real player rounds pulled from production. Large, and personal
+# data -- keep them local.
+tests/fixtures/*.parquet
+tests/fixtures/*.csv
+tests/fixtures/*.jsonl
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Scratch clone left behind by a skill run -- not part of this project.
+.claude/.skill/_tmp_seg/
+
+# ---------------------------------------------------------------------------
+# OS / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

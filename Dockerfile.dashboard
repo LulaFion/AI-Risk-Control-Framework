@@ -1,0 +1,31 @@
+# riskdet dashboard as a Cloud Run SERVICE (always-on HTTP), reading the LIVE
+# GCS bucket via a gcsfuse mount at /data. Server-side is just Flask + stdlib
+# (charts are client-side Chart.js), so the image is tiny.
+#
+# Access: deploy with --no-allow-unauthenticated; reach it via
+#   gcloud run services proxy riskdet-dashboard --region us-central1 --port 8080
+# (browser -> http://localhost:8080), or put IAP in front for a browser-native URL.
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+RUN adduser --disabled-password --gecos "" --uid 10001 riskdet
+RUN pip install --no-cache-dir "flask>=3,<4" "gunicorn>=22,<24"
+
+COPY dashboard/ ./dashboard/
+
+ENV PYTHONPATH=/app/dashboard \
+    RISKDET_DASHBOARD_ROOT=/data \
+    RISKDET_DASHBOARD_SOURCE=real
+# The bucket is mounted at /data at deploy time, so RISKDET_DASHBOARD_ROOT=/data
+# makes the provider read /data/out + /data/output (the live production artifacts).
+
+RUN mkdir -p /data && chown -R riskdet /data
+USER riskdet
+WORKDIR /app/dashboard
+
+# Cloud Run injects $PORT (8080). Shell form so $PORT expands. app:app = the
+# Flask `app` in dashboard/app.py (PYTHONPATH makes `from providers import` work).
+CMD exec gunicorn --bind :${PORT:-8080} --workers 2 --threads 4 --timeout 120 app:app

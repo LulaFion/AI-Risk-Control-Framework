@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="{{ 'zh-Hant' if lang == 'zh' else 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Risk Control{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>window.PAGE_LANG = {{ lang | tojson }};</script>
+</head>
+<body>
+<header class="top-header">
+    <div class="header-container">
+        <div class="header-left">
+            <div class="logo">
+                <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="14" stroke="#58a6ff" stroke-width="2" opacity="0.5"/>
+                    <path d="M16 6 L24 10 V16 C24 21 20.5 25 16 26 C11.5 25 8 21 8 16 V10 Z"
+                          fill="#58a6ff" opacity="0.25" stroke="#58a6ff" stroke-width="1.5"/>
+                    <circle cx="16" cy="16" r="3" fill="#58a6ff"/>
+                </svg>
+            </div>
+            <h1 class="header-title">AI Risk Control</h1>
+            <span class="header-sub" data-i18n="tagline"></span>
+        </div>
+        <nav class="header-nav">
+            <a href="/{{ lang }}/" class="nav-link {% block nav_digest %}{% endblock %}" data-i18n="nav_digest"></a>
+            <a href="/{{ lang }}/history" class="nav-link {% block nav_history %}{% endblock %}" data-i18n="nav_history"></a>
+            <span class="lang-switch">
+                <a href="{{ '/zh' + request.path[3:] if lang == 'en' else request.path }}"
+                   class="lang-btn {{ 'active' if lang == 'zh' }}">繁中</a><span class="lang-sep">|</span><a
+                   href="{{ '/en' + request.path[3:] if lang == 'zh' else request.path }}"
+                   class="lang-btn {{ 'active' if lang == 'en' }}">EN</a>
+            </span>
+        </nav>
+    </div>
+</header>
+<main class="page">
+    {% block content %}{% endblock %}
+</main>
+<footer class="page-footer" data-i18n="footer"></footer>
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

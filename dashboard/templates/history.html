@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ '歷史查詢 — AI Risk Control' if lang == 'zh' else 'History & Search — AI Risk Control' }}{% endblock %}
+{% block nav_history %}active{% endblock %}
+{% block content %}
+
+<div class="card">
+    <h2><span data-i18n="search_filter"></span> <span class="sub" data-i18n="has_before"></span></h2>
+    <div class="filters">
+        <div class="filter"><label data-i18n="free_text"></label>
+            <input type="text" id="f-q" data-i18n-ph="free_text_ph" placeholder=""></div>
+        <div class="filter"><label data-i18n="risk_type"></label>
+            <select id="f-type"><option value="" data-i18n="all"></option>
+                {% for t in risk_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}</select></div>
+        <div class="filter"><label data-i18n="severity"></label>
+            <select id="f-sev"><option value="" data-i18n="all"></option>
+                {% for s in severities %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+        <div class="filter"><label data-i18n="status"></label>
+            <select id="f-status"><option value="" data-i18n="all"></option>
+                {% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></div>
+        <div class="filter"><label data-i18n="from"></label>
+            <input type="date" id="f-from" value="2026-05-22"></div>
+        <div class="filter"><label data-i18n="to"></label>
+            <input type="date" id="f-to" value="{{ default_date }}"></div>
+        <button class="btn" id="btn-search" data-i18n="search"></button>
+        <button class="btn ghost" id="btn-reset" data-i18n="reset"></button>
+    </div>
+</div>
+
+<div class="grid grid-kpi section-gap" id="stat-kpis"></div>
+
+<div class="grid grid-2 section-gap">
+    <div class="card">
+        <h2><span data-i18n="events_over_time"></span> <span class="sub" data-i18n="trend_sub"></span></h2>
+        <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+    </div>
+    <div class="card">
+        <h2 data-i18n="by_type"></h2>
+        <div class="chart-box"><canvas id="type-chart"></canvas></div>
+    </div>
+</div>
+
+<div class="card section-gap">
+    <h2><span data-i18n="historical"></span> <span class="sub" id="hist-count"></span></h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr>
+                <th data-i18n="detected"></th><th data-i18n="severity"></th>
+                <th data-i18n="type"></th><th data-i18n="event"></th>
+                <th data-i18n="operator"></th><th data-i18n="key_metric"></th>
+                <th data-i18n="status"></th>
+            </tr></thead>
+            <tbody id="hist-body"></tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+{% endblock %}

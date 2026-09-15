@@ -1,0 +1,20 @@
+# riskdet Layer-4 image -- the deterministic base PLUS the LLM agent runtime.
+# Used only by Dockerfile.l4 (the riskdet-l4 Cloud Run job). The lean scan
+# image keeps using requirements.txt with NO LLM SDK.
+
+-r requirements.txt
+
+# --- LLM agent runtime (Vertex AI; no API key) ---
+# Ships a bundled Claude Code runtime in a platform wheel (~93 MB manylinux),
+# so no separate Node.js install is needed. Auth to Vertex is via ambient ADC
+# (the runtime SA's metadata-server credentials) + CLAUDE_CODE_USE_VERTEX=1.
+claude-agent-sdk>=0.2.151,<0.3
+
+# --- artifact sync (agent-written cases/digest -> GCS for the dashboard) ---
+google-cloud-storage>=2.18,<4
+
+# --- optional: Gemini composer (RISKDET_L4_COMPOSER=gemini) via Vertex ---
+# The report/digest stage is plain text-gen (no tool loop), so it can run on
+# Gemini instead of Claude. Vertex auth via ADC (vertexai=True); no API key.
+# Note: gemini-3.7-flash is served from the `global` location, not a region.
+google-genai>=1.0,<2

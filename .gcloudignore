@@ -1,0 +1,37 @@
+# Upload only what the Dockerfile builds from. `gcloud ... --source` uses THIS
+# file (not .dockerignore). Keeps the build context tiny and credential-free.
+
+# --- credentials & secrets: never upload ---
+*.json
+!config/*.schema.json
+.env
+.env.*
+*.pem
+*.p12
+*-key.json
+*credential*
+*service-account*
+
+# --- generated artifacts & local state: not needed in the image ---
+out/
+output/
+tests/
+reference code/
+docs/
+.claude/*
+.git/
+scripts/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.parquet
+*.md
+
+# --- Layer-4 image (Dockerfile.l4) needs the agent contracts + ground rules ---
+# Negations MUST come after the *.md and .claude/* rules above so they win.
+!.claude/agents
+!.claude/agents/**
+!.claude/agents/*.md
+!CLAUDE.md

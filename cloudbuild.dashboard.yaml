@@ -1,0 +1,15 @@
+# Build + push the dashboard service image from Dockerfile.dashboard.
+#   gcloud builds submit --config cloudbuild.dashboard.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/acp-develop/riskdet/riskdet-dashboard:v1
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'Dockerfile.dashboard', '-t', '${_IMAGE}', '.']
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', '${_IMAGE}']
+images:
+  - '${_IMAGE}'
+substitutions:
+  _IMAGE: 'us-central1-docker.pkg.dev/acp-develop/riskdet/riskdet-dashboard:v1'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 600s

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ '事件詳情 — AI Risk Control' if lang == 'zh' else 'Event Detail — AI Risk Control' }}{% endblock %}
+{% block content %}
+
+<a href="javascript:history.back()" class="backlink" data-i18n="back"></a>
+
+<div class="event-head section-gap">
+    <div>
+        <h1 id="ev-title">…</h1>
+        <div class="meta" id="ev-meta"></div>
+    </div>
+    <div id="ev-chips" style="display:flex;gap:8px;align-items:center"></div>
+</div>
+
+<div class="card">
+    <h2 data-i18n="overview"></h2>
+    <div class="overview-grid" id="ev-overview"></div>
+</div>
+
+<div class="grid grid-2 section-gap">
+    <div>
+        <div class="card">
+            <h2><span data-i18n="why"></span> <span class="sub" data-i18n="why_sub"></span></h2>
+            <div id="ev-why"></div>
+        </div>
+        <div class="card section-gap">
+            <h2><span data-i18n="evidence"></span></h2>
+            <div id="ev-charts"></div>
+            <div class="section-gap">
+                <h2><span data-i18n="ev_rounds"></span> <span class="sub" data-i18n="ev_rounds_sub"></span></h2>
+                <div id="ev-rounds"></div>
+            </div>
+        </div>
+    </div>
+    <div>
+        <div class="card" id="ev-autoreport-card" style="display:none">
+            <div class="digest-body" id="ev-autoreport"></div>
+        </div>
+        <div class="card section-gap">
+            <h2><span data-i18n="ai_inv"></span> <span class="sub" data-i18n="ai_inv_sub"></span></h2>
+            <div class="digest-body" id="ev-ai"></div>
+            <div class="section-gap" id="ev-verified"></div>
+            <div id="ev-discrepancies"></div>
+        </div>
+        <div class="card section-gap">
+            <h2 data-i18n="explanations"></h2>
+            <div id="ev-expl"></div>
+        </div>
+        <div class="card section-gap">
+            <h2><span data-i18n="actions"></span> <span class="sub" data-i18n="actions_sub"></span></h2>
+            <div id="ev-actions"></div>
+        </div>
+        <div class="card section-gap">
+            <h2><span data-i18n="human_review"></span> <span class="sub" data-i18n="human_review_sub"></span></h2>
+            <div id="ev-disposition"></div>
+            <div class="review-form">
+                <label data-i18n="rv_decision"></label>
+                <select id="rv-decision">
+                    <option value="" data-i18n="rv_choose"></option>
+                    <option value="dismiss_benign"></option>
+                    <option value="keep_monitoring"></option>
+                    <option value="enhanced_monitoring"></option>
+                    <option value="needs_more_evidence"></option>
+                    <option value="escalate_to_board"></option>
+                    <option value="confirmed_for_action"></option>
+                </select>
+                <label data-i18n="rv_reviewer"></label>
+                <input id="rv-reviewer" type="text" placeholder="you@team">
+                <label data-i18n="rv_notes"></label>
+                <textarea id="rv-notes" rows="3"></textarea>
+                <button class="btn" id="rv-submit" data-i18n="rv_submit"></button>
+                <span id="rv-msg" class="rv-msg"></span>
+            </div>
+        </div>
+        <div class="card section-gap">
+            <h2 data-i18n="ev_status"></h2>
+            <ul class="timeline" id="ev-timeline"></ul>
+            <div class="section-gap" id="ev-related"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>const EVENT_ID = {{ event_id | tojson }};</script>
+<script src="{{ url_for('static', filename='js/event.js') }}"></script>
+{% endblock %}

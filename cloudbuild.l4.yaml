@@ -1,0 +1,21 @@
+# Build + push the Layer-4 image from Dockerfile.l4. `gcloud run jobs deploy
+# --source` only builds the default `Dockerfile`, so the L4 image (which carries
+# the LLM SDK + agent contracts) is built explicitly via this config.
+#
+#   gcloud builds submit --config cloudbuild.l4.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/acp-develop/riskdet/riskdet-l4:v1
+#
+# Upload context is governed by .gcloudignore (which now re-includes
+# .claude/agents/*.md and CLAUDE.md for this image).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'Dockerfile.l4', '-t', '${_IMAGE}', '.']
+  - name: gcr.io/cloud-builders/docker
+    args: ['push', '${_IMAGE}']
+images:
+  - '${_IMAGE}'
+substitutions:
+  _IMAGE: 'us-central1-docker.pkg.dev/acp-develop/riskdet/riskdet-l4:v1'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1200s

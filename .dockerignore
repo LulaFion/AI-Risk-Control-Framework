@@ -1,0 +1,29 @@
+# credentials must never enter an image layer
+*.json
+.env
+.env.*
+*.pem
+*.p12
+
+# generated artifacts and local state
+out/
+output/
+tests/
+reference code/
+docs/
+.claude/*
+.git/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+README.md
+CLAUDE.md
+
+# Layer-4 image (Dockerfile.l4) needs the agent contracts + binding ground
+# rules. These negations MUST come last so they win. The lean scan Dockerfile
+# never COPYs them, so they only enter the L4 image.
+!.claude/agents
+!.claude/agents/**
+!CLAUDE.md

@@ -1,0 +1,81 @@
+# ===========================================================================
+# exclusions.yaml -- the APPROVED exclusion list
+#
+# CLAUDE.md, Investigation Workflow step 2: "Exclude demo traffic and only those
+# QA/load-test accounts confirmed by an approved exclusion list."
+#
+# That word "only" is load-bearing. This file therefore ships with DEMO TRAFFIC
+# ONLY. No operator or account is excluded on the basis of a machine guess.
+#
+# There is a real tension in the spec, and this is how it is resolved:
+#
+#   - "Key GCP Schema" says QA/test fleets "must be filtered out to prevent
+#     statistical tail selection bias."
+#   - "Investigation Workflow" says exclusion requires prior human approval.
+#
+# Resolution: the Coordinated Cohort Detector (riskdet/layer3/cohorts.py)
+# writes PROPOSALS to out/proposed_exclusions.yaml with the evidence AND the
+# competing explanations (promotions, autoplay, shared terminals, affiliate
+# registration, migration, ETL artifacts -- similarity is a fact, its cause is
+# a hypothesis). Until a human moves an entry into THIS file:
+#
+#   - nothing is excluded and nothing is suppressed;
+#   - cohort members stay fully visible in every analysis and ranking;
+#   - downstream results are reported BOTH ways -- inclusive and
+#     leave-cohort-out -- so selection-bias protection comes from the dual
+#     baseline, not from an unapproved filter;
+#   - cohort membership is carried on candidates as context, available to the
+#     skeptic as a benign explanation (CLAUDE.md Multi-Direction Fusion).
+# ===========================================================================
+
+# --- demo / non-real-money traffic -----------------------------------------
+# Verified from the data, not inferred: test_demo_play is a STRING column and
+# 'acdemo' is a demo operator. Both are excluded everywhere, unconditionally.
+demo:
+  test_demo_play_values: ["True"]
+  parents: ["acdemo"]
+
+# --- approved QA / load-test fleets ---------------------------------------
+# EMPTY BY DESIGN. Populate only from out/proposed_exclusions.yaml after review.
+#
+# Each entry requires: who approved it, when, and the evidence. An exclusion
+# silently removes a population from every future report, so it needs the same
+# audit trail as a finding.
+#
+# Example of the required shape (commented out -- not active):
+#
+# approved_fleets:
+#   - parent: "some_parent"
+#     uid_pattern: "^ab[0-9]{9}$"     # optional; omit to exclude whole parent
+#     approved_by: "name"
+#     approved_on: "2026-08-18"
+#     evidence: "out/proposed_exclusions.yaml#cohort_3; 42 sequential uids,
+#                24/24h duty cycle, pooled RTP within 0.4 sigma of certified"
+#     ticket: "RISK-123"
+approved_fleets: []
+
+# --- accounts excluded for other reasons -----------------------------------
+# e.g. internal staff accounts, known integration test users. Same audit
+# requirements as above.
+approved_accounts: []
+
+# --- operators out of scope ------------------------------------------------
+# Not a risk judgement: use for operators genuinely outside the analysis remit
+# (wrong product, wrong jurisdiction, decommissioned).
+out_of_scope_parents: []
+
+# --- games out of scope ----------------------------------------------------
+# The catalogue contains non-slot round games. Excluding them from a SLOT screen
+# is a scope decision, not a risk one. CLAUDE.md's pipeline is slot-only.
+# Verified from the sheet: 1002s (HighLow Dice) and 1003m (Cash Rocket) have
+# 'n/a' layout and are Round games; 6801r (Draw Red) and 6901g (Send Gift) carry
+# no game metadata at all.
+out_of_scope_games:
+  - game_id: "1002s"
+    reason: "Round game (HighLow Dice), not a slot -- 'n/a' paylines/layout"
+  - game_id: "1003m"
+    reason: "Round game (Cash Rocket), not a slot -- no RTP, 'n/a' layout"
+  - game_id: "6801r"
+    reason: "Draw Red -- no game metadata, not a slot"
+  - game_id: "6901g"
+    reason: "Send Gift -- no game metadata, not a slot"

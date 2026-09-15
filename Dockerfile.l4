@@ -1,0 +1,51 @@
+# riskdet Layer-4 image -- the LLM agent chain (player-investigator -> skeptic
+# -> report-composer) driven against Vertex AI, for the `riskdet-l4` Cloud Run
+# job. Separate from the lean scan image (Dockerfile) which carries NO LLM SDK.
+#
+# Auth: Vertex via ambient ADC (the runtime SA's metadata-server credentials).
+# NO API key, NO credential file -- .dockerignore excludes *.json from layers.
+# IAM required on the runtime SA: roles/aiplatform.user (Vertex), plus the same
+# BigQuery read + Cloud Logging viewer the scan job uses (the investigator pulls
+# spin-server logs), and storage.objectAdmin on the sync bucket.
+#
+# Build + deploy: see scripts/deploy_cloudrun.sh (the riskdet-l4 block).
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+RUN adduser --disabled-password --gecos "" --uid 10001 riskdet
+
+# The claude-agent-sdk wheel bundles its own runtime; no apt/node needed.
+COPY requirements.txt requirements-l4.txt ./
+RUN pip install --no-cache-dir -r requirements-l4.txt
+
+# Deterministic package + config + certified sheet (investigator/skeptic run
+# `python -m riskdet pull-logs` and read the archive aggregates).
+COPY riskdet/ ./riskdet/
+COPY config/ ./config/
+COPY ["OMG Game Info.csv", "./OMG Game Info.csv"]
+
+# The agent contracts (single source of truth) + their binding ground rules.
+# The driver parses .claude/agents/*.md at runtime; the agents cite CLAUDE.md.
+COPY .claude/agents/ ./.claude/agents/
+COPY CLAUDE.md ./CLAUDE.md
+
+ENV RISKDET_ROOT=/app \
+    RISKDET_OUT_DIR=/data/out \
+    RISKDET_ARTIFACT_DIR=/data/output \
+    RISKDET_CATALOG_CSV="/app/OMG Game Info.csv" \
+    PYTHONPATH=/app
+# Backend + models + project/region are supplied at deploy time (--set-env-vars),
+# so the image is neutral: RISKDET_L4_BACKEND=anthropic (API key via --set-secrets
+# ANTHROPIC_API_KEY) or =vertex (CLAUDE_CODE_USE_VERTEX is set per-backend by the
+# driver, not baked here). The Gemini composer uses Vertex ADC either way.
+
+RUN mkdir -p /data/out /data/output && chown -R riskdet /data
+USER riskdet
+
+ENTRYPOINT ["python", "-m", "riskdet"]
+# Default to a zero-cost gate preview; the real run overrides args at execute
+# time, e.g. --args layer4,--as-of,2026-09-01T00:00:00
+CMD ["layer4", "--as-of", "2026-09-01T00:00:00", "--dry-run"]

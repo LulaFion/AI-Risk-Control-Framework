@@ -1,0 +1,22 @@
+# riskdet -- AI Risk Detector (GCP)
+# No LLM SDK on purpose: Layer 4 is the Claude Code subagent team.
+# No subprocess/bq/gcloud: everything goes through these client libraries.
+
+# --- GCP clients ---
+google-cloud-bigquery>=3.25,<4
+google-cloud-logging>=3.11,<4
+google-auth>=2.30,<3
+db-dtypes>=1.2          # REQUIRED: BigQuery DATE/DATETIME -> pandas; to_dataframe raises without it
+
+# --- data / stats / ML ---
+pandas>=2.2,<3
+numpy>=1.26,<3
+scipy>=1.13
+scikit-learn>=1.5
+pyarrow>=16             # parquet artifacts
+
+# --- config ---
+PyYAML>=6.0
+
+# --- dev/test (optional) ---
+# pytest>=8
